@@ -1,25 +1,215 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {number,propertyFinancials,upgradeFinancials,rankUpgrades,caseProperty,initialUpgrades} from '../src/finance.js';
-const property=()=>({...caseProperty(),vacancy:'5',cap:'6',expenses:{total:'12000'}});
-const upgrade=()=>({...initialUpgrades()[0],cost:'10000',kwh:'3000',maintenance:'100',payer:'owner'});
-const close=(a,b)=>assert.ok(Math.abs(a-b)<1e-7,`${a} != ${b}`);
-test('monthly scheduled rent annualizes across all units',()=>assert.equal(propertyFinancials(property()).potential,42000));
-test('vacancy, expenses and NOI follow annual units',()=>{const r=propertyFinancials(property());assert.equal(r.effective,39900);assert.equal(r.operating,12000);assert.equal(r.noi,27900)});
-test('income-based value uses a percentage cap rate',()=>assert.equal(propertyFinancials(property()).value,465000));
-test('missing expenses never become zero',()=>{const p=caseProperty();p.vacancy='0';assert.equal(propertyFinancials(p).noi,null);assert.equal(propertyFinancials(p).operating,null)});
-test('explicit zero expenses and zero vacancy remain valid',()=>assert.equal(propertyFinancials({...property(),vacancy:'0',expenses:{all:'0'}}).noi,42000));
-test('invalid cap rates cannot generate values',()=>{for(const cap of ['0','-1','101','abc',''])assert.equal(propertyFinancials({...property(),cap}).value,null)});
-test('owner-paid electricity flows into NOI',()=>{const r=upgradeFinancials(upgrade(),property());close(r.gross,457.2);close(r.owner,357.2);assert.equal(r.tenant,0);close(r.projected,28257.2);close(r.valueChange,5953.3333333333);close(r.payback,10000/357.2)});
-test('tenant-paid electricity never flows into owner NOI',()=>{const r=upgradeFinancials({...upgrade(),payer:'tenant'},property());close(r.tenant,457.2);assert.equal(r.owner,-100);assert.equal(r.projected,27800);assert.equal(r.payback,null)});
-test('shared electricity conserves gross savings',()=>{const r=upgradeFinancials({...upgrade(),payer:'shared',share:'40'},property());close(r.owner,82.88);close(r.tenant,274.32);close(r.owner+r.tenant+100,r.gross)});
-test('invalid shared percentages block results',()=>{for(const share of ['','-1','101'])assert.equal(upgradeFinancials({...upgrade(),payer:'shared',share},property()).owner,null)});
-test('zero and negative savings have no positive payback',()=>{for(const maintenance of ['0','100']){const r=upgradeFinancials({...upgrade(),kwh:'0',maintenance},property());assert.equal(r.payback,null)}});
-test('missing energy, cost and maintenance propagate individually',()=>{assert.equal(upgradeFinancials(initialUpgrades()[0],property()).owner,null);assert.equal(upgradeFinancials({...upgrade(),cost:''},property()).payback,null);assert.equal(upgradeFinancials({...upgrade(),maintenance:''},property()).owner,null)});
-test('undocumented insurance and incentives are not credited',()=>{const r=upgradeFinancials({...upgrade(),insurance:'999',incentive:'999',insuranceVerified:true,incentiveVerified:true},property());close(r.owner,357.2);assert.equal(r.netCost,10000)});
-test('documented insurance and incentives affect correct units',()=>{const r=upgradeFinancials({...upgrade(),insurance:'200',insuranceVerified:true,insuranceEvidence:'Insurer letter',incentive:'1000',incentiveVerified:true,incentiveEvidence:'Eligibility letter'},property());close(r.owner,557.2);assert.equal(r.netCost,9000)});
-test('incentives exceeding costs do not produce negative installation cost',()=>assert.equal(upgradeFinancials({...upgrade(),incentive:'11000',incentiveVerified:true,incentiveEvidence:'Letter'},property()).netCost,null));
-test('rankings sort independently and exclude missing values',()=>{const items=[{id:0,result:{owner:0,tenant:400,netCost:100,payback:null}},{id:1,result:{owner:200,tenant:0,netCost:2000,payback:10}},{id:2,result:{owner:null,tenant:null,netCost:null,payback:null}}];assert.deepEqual(rankUpgrades(items,'owner').map(x=>x.id),[1,0]);assert.deepEqual(rankUpgrades(items,'tenant').map(x=>x.id),[0,1]);assert.deepEqual(rankUpgrades(items,'netCost').map(x=>x.id),[0,1]);assert.deepEqual(rankUpgrades(items,'payback').map(x=>x.id),[1])});
-test('invalid numeric inputs rejected',()=>{for(const n of ['','   ',[],{},null,undefined,true,-1,'abc','Infinity',NaN,Infinity])assert.equal(number(n),null);assert.equal(number('0'),0)});
-test('invalid vacancy prevents effective income',()=>{for(const vacancy of ['-1','101',''])assert.equal(propertyFinancials({...property(),vacancy}).effective,null)});
-test('chart inputs match exact scenario and ranking data',()=>{const items=initialUpgrades().map((u,i)=>({...u,result:upgradeFinancials({...upgrade(),payer:i===0?'tenant':'owner',kwh:String(i*1000)},property())}));for(const x of items){const ranked=rankUpgrades(items,'owner').find(y=>y.id===x.id);assert.equal(ranked.result.owner,x.result.owner);assert.equal(ranked.result.tenant,x.result.tenant)}});
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  number,
+  propertyFinancials,
+  upgradeFinancials,
+  rankUpgrades,
+  caseProperty,
+  initialUpgrades,
+} from "../src/finance.js";
+const property = () => ({
+  ...caseProperty(),
+  vacancy: "5",
+  cap: "6",
+  expenses: { total: "12000" },
+});
+const upgrade = () => ({
+  ...initialUpgrades()[0],
+  cost: "10000",
+  kwh: "3000",
+  maintenance: "100",
+  payer: "owner",
+});
+const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-7, `${a} != ${b}`);
+test("monthly scheduled rent annualizes across all units", () =>
+  assert.equal(propertyFinancials(property()).potential, 42000));
+test("vacancy, expenses and NOI follow annual units", () => {
+  const r = propertyFinancials(property());
+  assert.equal(r.effective, 39900);
+  assert.equal(r.operating, 12000);
+  assert.equal(r.noi, 27900);
+});
+test("income-based value uses a percentage cap rate", () =>
+  assert.equal(propertyFinancials(property()).value, 465000));
+test("missing expenses never become zero", () => {
+  const p = caseProperty();
+  p.vacancy = "0";
+  assert.equal(propertyFinancials(p).noi, null);
+  assert.equal(propertyFinancials(p).operating, null);
+});
+test("explicit zero expenses and zero vacancy remain valid", () =>
+  assert.equal(
+    propertyFinancials({ ...property(), vacancy: "0", expenses: { all: "0" } })
+      .noi,
+    42000,
+  ));
+test("invalid cap rates cannot generate values", () => {
+  for (const cap of ["0", "-1", "101", "abc", ""])
+    assert.equal(propertyFinancials({ ...property(), cap }).value, null);
+});
+test("owner-paid electricity flows into NOI", () => {
+  const r = upgradeFinancials(upgrade(), property());
+  close(r.gross, 457.2);
+  close(r.owner, 357.2);
+  assert.equal(r.tenant, 0);
+  close(r.projected, 28257.2);
+  close(r.valueChange, 5953.3333333333);
+  close(r.payback, 10000 / 357.2);
+});
+test("tenant-paid electricity never flows into owner NOI", () => {
+  const r = upgradeFinancials({ ...upgrade(), payer: "tenant" }, property());
+  close(r.tenant, 457.2);
+  assert.equal(r.owner, -100);
+  assert.equal(r.projected, 27800);
+  assert.equal(r.payback, null);
+});
+test("shared electricity conserves gross savings", () => {
+  const r = upgradeFinancials(
+    { ...upgrade(), payer: "shared", share: "40" },
+    property(),
+  );
+  close(r.owner, 82.88);
+  close(r.tenant, 274.32);
+  close(r.owner + r.tenant + 100, r.gross);
+});
+test("invalid shared percentages block results", () => {
+  for (const share of ["", "-1", "101"])
+    assert.equal(
+      upgradeFinancials({ ...upgrade(), payer: "shared", share }, property())
+        .owner,
+      null,
+    );
+});
+test("zero and negative savings have no positive payback", () => {
+  for (const maintenance of ["0", "100"]) {
+    const r = upgradeFinancials(
+      { ...upgrade(), kwh: "0", maintenance },
+      property(),
+    );
+    assert.equal(r.payback, null);
+  }
+});
+test("missing energy, cost and maintenance propagate individually", () => {
+  assert.equal(upgradeFinancials(initialUpgrades()[0], property()).owner, null);
+  assert.equal(
+    upgradeFinancials({ ...upgrade(), cost: "" }, property()).payback,
+    null,
+  );
+  assert.equal(
+    upgradeFinancials({ ...upgrade(), maintenance: "" }, property()).owner,
+    null,
+  );
+});
+test("undocumented insurance and incentives are not credited", () => {
+  const r = upgradeFinancials(
+    {
+      ...upgrade(),
+      insurance: "999",
+      incentive: "999",
+      insuranceVerified: true,
+      incentiveVerified: true,
+    },
+    property(),
+  );
+  close(r.owner, 357.2);
+  assert.equal(r.netCost, 10000);
+});
+test("documented insurance and incentives affect correct units", () => {
+  const r = upgradeFinancials(
+    {
+      ...upgrade(),
+      insurance: "200",
+      insuranceVerified: true,
+      insuranceEvidence: "Insurer letter",
+      incentive: "1000",
+      incentiveVerified: true,
+      incentiveEvidence: "Eligibility letter",
+    },
+    property(),
+  );
+  close(r.owner, 557.2);
+  assert.equal(r.netCost, 9000);
+});
+test("incentives exceeding costs do not produce negative installation cost", () =>
+  assert.equal(
+    upgradeFinancials(
+      {
+        ...upgrade(),
+        incentive: "11000",
+        incentiveVerified: true,
+        incentiveEvidence: "Letter",
+      },
+      property(),
+    ).netCost,
+    null,
+  ));
+test("rankings sort independently and exclude missing values", () => {
+  const items = [
+    { id: 0, result: { owner: 0, tenant: 400, netCost: 100, payback: null } },
+    { id: 1, result: { owner: 200, tenant: 0, netCost: 2000, payback: 10 } },
+    {
+      id: 2,
+      result: { owner: null, tenant: null, netCost: null, payback: null },
+    },
+  ];
+  assert.deepEqual(
+    rankUpgrades(items, "owner").map((x) => x.id),
+    [1, 0],
+  );
+  assert.deepEqual(
+    rankUpgrades(items, "tenant").map((x) => x.id),
+    [0, 1],
+  );
+  assert.deepEqual(
+    rankUpgrades(items, "netCost").map((x) => x.id),
+    [0, 1],
+  );
+  assert.deepEqual(
+    rankUpgrades(items, "payback").map((x) => x.id),
+    [1],
+  );
+});
+test("invalid numeric inputs rejected", () => {
+  for (const n of [
+    "",
+    "   ",
+    [],
+    {},
+    null,
+    undefined,
+    true,
+    -1,
+    "abc",
+    "Infinity",
+    NaN,
+    Infinity,
+  ])
+    assert.equal(number(n), null);
+  assert.equal(number("0"), 0);
+});
+test("invalid vacancy prevents effective income", () => {
+  for (const vacancy of ["-1", "101", ""])
+    assert.equal(
+      propertyFinancials({ ...property(), vacancy }).effective,
+      null,
+    );
+});
+test("chart inputs match exact scenario and ranking data", () => {
+  const items = initialUpgrades().map((u, i) => ({
+    ...u,
+    result: upgradeFinancials(
+      {
+        ...upgrade(),
+        payer: i === 0 ? "tenant" : "owner",
+        kwh: String(i * 1000),
+      },
+      property(),
+    ),
+  }));
+  for (const x of items) {
+    const ranked = rankUpgrades(items, "owner").find((y) => y.id === x.id);
+    assert.equal(ranked.result.owner, x.result.owner);
+    assert.equal(ranked.result.tenant, x.result.tenant);
+  }
+});

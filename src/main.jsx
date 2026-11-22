@@ -364,7 +364,35 @@ function App() {
                   </button>
                 </div>
               </section>
-              {summary}<div className="metrics supplementary"><Card label="Effective gross income" value={money(f.effective)} note="After your vacancy assumption"/><Card label="Annual operating expenses" value={money(f.operating)} note="All expense categories required"/><Card label="Annual tenant savings" value={money(r.tenant)} note={`${u.name} · tenant energy benefit`}/><Card label="Simple owner payback" value={r.owner!==null&&r.owner<=0?'No positive payback':r.payback===null?'Missing information':`${r.payback.toFixed(1)} years`} note={`Estimated value change: ${money(r.valueChange)}`}/></div>
+              {summary}
+              <div className="metrics supplementary">
+                <Card
+                  label="Effective gross income"
+                  value={money(f.effective)}
+                  note="After your vacancy assumption"
+                />
+                <Card
+                  label="Annual operating expenses"
+                  value={money(f.operating)}
+                  note="All expense categories required"
+                />
+                <Card
+                  label="Annual tenant savings"
+                  value={money(r.tenant)}
+                  note={`${u.name} · tenant energy benefit`}
+                />
+                <Card
+                  label="Simple owner payback"
+                  value={
+                    r.owner !== null && r.owner <= 0
+                      ? "No positive payback"
+                      : r.payback === null
+                        ? "Missing information"
+                        : `${r.payback.toFixed(1)} years`
+                  }
+                  note={`Estimated value change: ${money(r.valueChange)}`}
+                />
+              </div>
               <div className="two-col">
                 <section className="panel">{comparison}</section>
                 <section className="panel insight">
